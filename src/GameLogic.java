@@ -76,22 +76,20 @@ public class GameLogic {
     }
 
     public void checkStrings(int row, int col){
-                //early exit
-                if(tiles[row][col].isLabel() || tiles[row][col].getSide() == -1)
-                    return;
-                
-                ArrayList<Tile> string = new ArrayList<>();
-                for(int[] direction: surroundingTiles){
-                    int dx = col + direction[0];
-                    int dy = row + direction[1];
-                    if (dy >= 1 && dy <= dim) {
-                        if (dx >= 1 && dx <= dim) {
+        //early exit
+        if(tiles[row][col].isLabel() || tiles[row][col].getSide() == -1)
+            return;
 
-                        }
-                            tilesToCheck.add(tiles[dy][dx]);
-                        }
-                    }
+        ArrayList<Tile> string = new ArrayList<>();
+        for(int[] direction: surroundingTiles){
+            int dx = col + direction[0];
+            int dy = row + direction[1];
+            if (dy >= 1 && dy <= dim) {
+                if (dx >= 1 && dx <= dim) {
+                    string.add(tiles[dy][dx]);
                 }
+            }
+        }
     }
 
     public int getMoveNo() {
