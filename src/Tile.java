@@ -18,7 +18,7 @@ public class Tile {
         this.label = label;
         this.size = size;
         this.posX = posX;
-        this.posY = posX;
+        this.posY = posY;
     }
 
     public void tick(){
@@ -27,17 +27,28 @@ public class Tile {
 
         if (game.getWindow().getMouseListener().isMouseClicked()) {
             if (contains(mX, mY) && !isLabel) {
-                if(!isPlaced) {
-                    isPlaced = true;
-                    game.getGameLogic().incerementMoveNo();
-                    if (game.getGameLogic().getMoveNo() % 2 != 0) {
-                        color = Color.black;
-                        side = 0;
-                    }else{
-                        color = Color.white;
-                        side = 1;
+                if (game.getGameLogic().getMoveNo() % 2 != 0) {
+                    side = 0;
+                } else {
+                    side = 1;
+                }
+                if (game.getGameLogic().canPlace(posY, posX, side)) {
+                    if (!isPlaced) {
+                        isPlaced = true;
+                        game.getGameLogic().incerementMoveNo();
+                        if (side == 1) {
+                            color = Color.black;
+                        } else {
+                            color = Color.white;
+                        }
+                        //adjust Go strings
+                        game.getGameLogic().checkStrings(posY, posX, side);
+                        game.getWindow().getMouseListener().setMouseClicked(false);
                     }
+                }else{
+                    System.out.println("cant place there");
                     game.getWindow().getMouseListener().setMouseClicked(false);
+                    return;
                 }
             }
             return;
