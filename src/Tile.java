@@ -4,13 +4,14 @@ import java.net.URL;
 public class Tile {
     private Go game;
     private float mX, mY;
-    private int x, y, id = 0, tileID, posX, posY, side = -1;
+    private int x, y, tileID, posX, posY, side = -1;
     private boolean isPlaced = false, isLabel, isEdge, render = true;
     private int size;
     private String label;
     private Color color;
+    private boolean internalCapture = false;
 
-    public Tile(Go game, int x, int y, boolean isLabel, boolean isEdge, String label, int size, int posX, int posY, boolean render){
+    public Tile(Go game, int x, int y, boolean isLabel, String label, int size, int posX, int posY){
         this.game = game;
         this.x = x;
         this.y = y;
@@ -35,7 +36,6 @@ public class Tile {
                 if (game.getGameLogic().canPlace(posY, posX, side)) {
                     if (!isPlaced) {
                         isPlaced = true;
-                        game.getGameLogic().incerementMoveNo();
                         if (side == 1) {
                             color = Color.black;
                         } else {
@@ -46,9 +46,7 @@ public class Tile {
                         game.getWindow().getMouseListener().setMouseClicked(false);
                     }
                 }else{
-                    System.out.println("cant place there");
                     game.getWindow().getMouseListener().setMouseClicked(false);
-                    return;
                 }
             }
             return;
@@ -77,6 +75,14 @@ public class Tile {
 
     }
 
+
+    public boolean isInternalCapture() {
+        return internalCapture;
+    }
+
+    public void setInternalCapture(boolean internalCapture) {
+        this.internalCapture = internalCapture;
+    }
 
     public int getSide() {
         return side;

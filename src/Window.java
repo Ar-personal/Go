@@ -70,7 +70,7 @@ public class Window extends JPanel{
         for (int row = 0; row < tiles.length; row++) {
             x = 0;
             for (int column = 0; column < tiles[row].length; column++) {
-                tiles[row][column] = new Tile(game, x, y, false, false, "", size, column, row, true);
+                tiles[row][column] = new Tile(game, x, y, false, "", size, column, row);
 
                 //the fringe tiles
                 if(row == 1 & column == 0 || column == 1 && row == 0){

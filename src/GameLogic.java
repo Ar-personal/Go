@@ -7,6 +7,7 @@ import java.util.List;
 public class GameLogic {
 
     private Go game;
+    private PointLogic pointLogic;
     private Tile[][] tiles;
     private int dim;
     private int moveNo;
@@ -15,98 +16,102 @@ public class GameLogic {
     private int whiteCaptured = 0;
     private int blackCaptured = 0;
     private int[][] surroundingTiles = new int[][]{{+1, 0}, {0, -1}, {-1, 0}, {0, + 1}};
-    private HashMap<Point, List<Point>> strings = new HashMap<>();
+    private List<GoString> strings = new ArrayList<>();
 
     public GameLogic(Go game, Tile[][] tiles, int dim) {
         this.game = game;
         this.tiles = tiles;
         this.dim = dim;
+        pointLogic = new PointLogic(strings);
     }
 
 
     public void tick(){
 //        checkSingleCaptures();
-
+        pointLogic.updatePoints(strings);
         checkStringCaptures();
     }
 
     public boolean canPlace(int row, int col, int side){
-        //cant be placed if would be surrounded
-        //can be placed if Ko rule
+        List<Point> tryPlace = new ArrayList<>();
+        Point p = new Point(col, row);
+        tryPlace.add(p);
+
         int stringLiberties = 0;
         int enemyOccupied = 0;
-        Point pos = new Point(col, row);
-        List<Point> libs = new ArrayList<>();
-        libs.add(pos);
-        List<Point> occu = new ArrayList<>();
-        occu.add(pos);
-        stringLiberties = countLiberties(libs);
-        enemyOccupied = countEnemyOccupied(occu);
-        if(stringLiberties == enemyOccupied){
-            return false;
+        //check entire strings liberty count
+        stringLiberties = countLiberties(tryPlace);
+        enemyOccupied = countEnemyOccupied(tryPlace);
+
+
+        if(stringLiberties == enemyOccupied && enemyOccupied > 1){
+            //if would result in string capture
+            if(StringCaptureOnPlace(p, side)){
+                incerementMoveNo();
+                tiles[row][col].setInternalCapture(true);
+                return true;
+            }else{
+                System.out.println("Cannot place without Ko");
+                return false;
+            }
         }
+        //cant be placed if would be surrounded
+        //can be placed if Ko rule
+        //if placment results in a string capture return true
+        //if no capture and stone would be surrounded reutn false
+        //ko?
+        incerementMoveNo();
         return true;
     }
 
-    public void checkSingleCaptures(){
-        for(int row = 0; row < tiles.length; row++){
-            for(int col = 0; col < tiles[row].length; col++) {
-                Tile tile = tiles[row][col];
-                //early exit
-                if(tile.isLabel() || tile.getSide() == -1)
-                    continue;
-
-                ArrayList<Tile> tilesToCheck = new ArrayList<Tile>();
-                for(int[] direction: surroundingTiles){
-                    int dx = col + direction[0];
-                    int dy = row + direction[1];
-                    Tile o = tiles[dy][dx];
-                    if (dy >= 1 && dy <= dim) {
-                        if (dx >= 1 && dx <= dim) {
-                            tilesToCheck.add(o);
-                        }
+    public boolean StringCaptureOnPlace(Point p, int side){
+        //for all strings if new stone causes string removal return true
+        int killCount = 0;
+        List<Point> others = new ArrayList();
+        for (int[] direction : surroundingTiles) {
+            int dx = p.x + direction[0];
+            int dy = p.y + direction[1];
+            Point newPoint = new Point(dx, dy);
+            if (side != tiles[p.y][p.x].getSide()) {
+                others.add(newPoint);
+                if (dy >= 1 && dy <= dim) {
+                    if (dx >= 1 && dx <= dim) {
+                        int cl = countLiberties(others);
+                        int ce = countEnemyOccupied(others);
+                        if (cl == ce)
+                            killCount++;
                     }
                 }
-
-                //check if immediate tiles are same colour or not, if all are opposite colour then it is captured
-                int opp = 0;
-                for(Tile t : tilesToCheck){
-                    if(!t.isLabel() && t.isPlaced() && t.getSide() >= 0){
-                        //check surrounding tiles for their colour or if unplaced
-                        if(tile.getSide() != t.getSide())
-                            opp++;
-                        if(opp == tilesToCheck.size() && opp > 1) {
-                            System.out.println("removing tile");
-                            tile.setPlaced(false);
-                            //add to score
-                            if(tile.getSide() == 1){
-                                blackCaptured++;
-                                System.out.println("black_score: " + blackCaptured);
-                            }else if(tile.getSide() == 0){
-                                whiteCaptured++;
-                                System.out.println("white_score: " + whiteCaptured);
-                            }
-
-                            t.setSide(-1);
-                            return;
-                        }
-                    }
-                }
+                others.clear();
             }
         }
+        if(killCount == 4){
+            return true;
+        }
+        return false;
     }
+
+    public void findTerritories(){
+
+    }
+
 
     //when a group of stones is surrounded
     public void checkStringCaptures(){
         if(strings.isEmpty())
             return;
         Point toRemove = null;
-        for(Point root : strings.keySet()){
-            List<Point> toCheck = new ArrayList<>();
-            toCheck.add(root);
-            if(strings.get(root).size() > 0) {
-                toCheck.addAll(strings.get(root));
+        for(GoString string : strings){
+            if(tiles[string.getRoot().y][string.getRoot().x].isInternalCapture()){
+                tiles[string.getRoot().y][string.getRoot().x].setInternalCapture(false);
+                continue;
             }
+            List<Point> toCheck = new ArrayList<>();
+            toCheck.add(string.getRoot());
+            if(string.getNodes().size() > 0) {
+                toCheck.addAll(string.getNodes());
+            }
+
             int stringLiberties = 0;
             int enemyOccupied = 0;
             //check entire strings liberty count
@@ -115,7 +120,7 @@ public class GameLogic {
 
             if(stringLiberties > 0 && enemyOccupied > 0  && stringLiberties == enemyOccupied){
                 //entire string is surrounded
-                toRemove = root;
+                toRemove = string.getRoot();
                 break;
             }
         }
@@ -123,106 +128,30 @@ public class GameLogic {
             removeString(toRemove);
     }
 
-    public void checkStrings(int row, int col, int side){
-        //duplicate array so we cna remove and make traversing faster
-        //check every remaining tile in copy
-        Tile tile = tiles[row][col];
-        Point coords = new Point(col, row);
-        //early exit
-        if (tile.isLabel() || tile.getSide() == -1)
-            return;
-
-        if(strings.keySet().size() == 0){
-            strings.put(coords, new ArrayList<>());
-            return;
-        }
-        //we have first tile and we want to check adjacent tiles for the same colour
-        //if there is adjaceent with same colour we want to check that one too
-        //ading to a list while checking for new adds and then probably remove tiles from pool
-        //other method to check adjacent tile that returns list
-        //check roots then values for tile
-        if(!strings.containsKey(coords)){
-            for(List<Point> i : strings.values()){
-                if(i.contains(coords)) {
-                    return;
-                }
-            }
-            addToStrings(coords, side);
-        }
-    }
-
-    public void addToStrings(Point coords, int side){
-        boolean added = false;
-            for (int[] direction : surroundingTiles) {
-                if(added){
-                    break;
-                }
-                int dx = coords.x + direction[0];
-                int dy = coords.y + direction[1];
-                Point newCoords = new Point(dx, dy);
-                //check bounds
-                if (dy >= 1 && dy <= dim) {
-                    if (dx >= 1 && dx <= dim) {
-                        Tile o = tiles[dy][dx];
-                        //check if surrounding tiles are a root, if so add to it
-                        if (o.getSide() != -1) {
-                            boolean root = strings.containsKey(newCoords);
-                            //add to root if same colour
-                            if (root && o.getSide() == side) {
-                                strings.get(newCoords).add(coords);
-                                added = true;
-                                break;
-                            }
-                            //if not key it might be a node, if so add to node
-                            for (List<Point> i : strings.values()) {
-                                //add if node found
-                                if (i.contains(newCoords) && o.getSide() == side) {
-                                    i.add(coords);
-                                    added = true;
-                                    break;
-                                }
-                            }
-                        }
-                    }
-                }
-        }
-        if(!added) {
-            strings.put(coords, new ArrayList<>());
-        }
-        List<Point> duplicateRoots = new ArrayList<>();
-        for (Point root : strings.keySet()){
-            if(strings.get(root).contains(coords) || root.equals(coords)){
-                duplicateRoots.add(root);
-            }
-        }
-        //merge strings
-        if(duplicateRoots.size() > 1){
-            Point newKey = coords;
-            List<Point> newValue = new ArrayList<>();
-            for (int i = 0; i < duplicateRoots.size(); i++){
-                strings.get(duplicateRoots.get(i)).remove(coords);
-                newValue.addAll(strings.get(duplicateRoots.get(i)));
-                newValue.add(duplicateRoots.get(i));
-                strings.remove(duplicateRoots.get(i));
-            }
-            strings.put(newKey, newValue);
-            return;
-        }
-    }
-
-
-
     public int countLiberties(List<Point> stones){
         int count = 0;
         for(Point p : stones) {
+            count += 4;
             for (int[] direction : surroundingTiles) {
                 int dx = p.x + direction[0];
                 int dy = p.y + direction[1];
-                //check bounds
+
+                if (dy < 1 || dy > dim) {
+                    count--;
+                }
+                if (dx < 1 || dx > dim) {
+                    count--;
+                }
+
                 if (dy >= 1 && dy <= dim) {
                     if (dx >= 1 && dx <= dim) {
-                        if(tiles[dy][dx].getSide() != tiles[p.y][p.x].getSide())
-                            count++;
+                        Point check = new Point(dx, dy);
+                        //check that the other tile is not a friendly stone and is definitely placed
+                        if (tiles[check.y][check.x].getSide() == tiles[p.y][p.x].getSide()) {
+                            if (tiles[check.y][check.x].getSide() >= 0) {
+                                count--;
+                            }
+                        }
                     }
                 }
             }
@@ -232,11 +161,12 @@ public class GameLogic {
 
     public int countEnemyOccupied(List<Point> occu){
         int count = 0;
-        for(Point p : occu) {
+        for(Point p : occu){
             for (int[] direction : surroundingTiles) {
                 int dx = p.x + direction[0];
                 int dy = p.y + direction[1];
                 //check bounds
+
                 if (dy >= 1 && dy <= dim) {
                     if (dx >= 1 && dx <= dim) {
                         Point check = new Point(dx, dy);
@@ -253,6 +183,108 @@ public class GameLogic {
         return count;
     }
 
+    //currently called by tile on tick
+    public void checkStrings(int row, int col, int side){
+        Tile tile = tiles[row][col];
+        Point coords = new Point(col, row);
+        //early exit
+        if (tile.isLabel() || tile.getSide() == -1)
+            return;
+
+        if(strings.size() == 0){
+            strings.add(new GoString(coords, new ArrayList<>(), side));
+            return;
+        }
+
+        if(!pointLogic.PointIsRoot(coords)){
+            //point is neither root nor node
+            if(!pointLogic.PointIsNode(coords)){
+                addToStrings(coords, side);
+            }
+        }
+    }
+
+    public void addToStrings(Point coords, int side){
+        int emptyCount = 0;
+        int adjacentCount = 0;
+            for (int[] direction : surroundingTiles) {
+                int dx = coords.x + direction[0];
+                int dy = coords.y + direction[1];
+                Point newCoords = new Point(dx, dy);
+                //check bounds
+                if (dy >= 1 && dy <= dim) {
+                    if (dx >= 1 && dx <= dim) {
+                        adjacentCount++;
+                        Tile o = tiles[dy][dx];
+                        //check if surrounding tiles are a root, if so add to it
+                        if (o.getSide() == side) {
+                            boolean root = pointLogic.PointIsRoot(newCoords);
+                            //add to root if same colour
+                            if (root && o.getSide() == side) {
+                                //root exists so add point as node
+                                pointLogic.getGoStringFromPoint(newCoords).addToNode(coords);
+                                pointLogic.updatePoints(strings);
+                                continue;
+                            }
+                            //if not key it might be a node, if so add to node
+                            if(pointLogic.PointIsNode(newCoords)) {
+                                //add if node found
+                                if (o.getSide() == side) {
+                                    //other tile is node so add as node to existing root
+                                    pointLogic.getGoStringFromPoint(newCoords).addToNode(coords);
+                                    pointLogic.updatePoints(strings);
+                                    continue;
+                                }
+                            }
+                        }else{
+                            emptyCount++;
+                        }
+                    }
+                }
+        }
+
+            //tile surrounded by empty tiles so new root
+        if(emptyCount == adjacentCount) {
+            strings.add(new GoString(coords, new ArrayList<>(), side));
+            pointLogic.updatePoints(strings);
+        }
+
+
+        //merge strings
+        checkForDuplicates(coords, side);
+    }
+
+    //check if this coordinate is a part of more than one string, if so a merge is needed
+    public void checkForDuplicates(Point coords, int side){
+        //find all string that contain a dupe
+        List<GoString> duplicateStrings = new ArrayList<>();
+        for (GoString string : strings){
+            if(string.PointIsNode(coords) || string.PointIsRoot(coords)){
+                if(string.getSide() == side)
+                    duplicateStrings.add(string);
+            }
+        }
+
+        //merge strings then delete duplicates
+        if(duplicateStrings.size() > 1) {
+            Point newKey = coords;
+            List<Point> newValue = new ArrayList<>();
+            for (int i = 0; i < duplicateStrings.size(); i++) {
+                //node
+                duplicateStrings.get(i).removeNode(coords);
+                newValue.addAll(duplicateStrings.get(i).getNodes());
+                Point r = duplicateStrings.get(i).getRoot();
+                newValue.add(r);
+                //remove duplicate strings as merger is replacing them
+            }
+            strings.removeAll(duplicateStrings);
+            strings.add(new GoString(newKey, newValue, side));
+        }
+    }
+
+
+
+
     public void removeString(Point root){
         Tile remove = tiles[root.y][root.x];
         int count = 0;
@@ -261,16 +293,21 @@ public class GameLogic {
             return;
         }
 
-        if(strings.get(root).size() > 0){
-            for(Point p : strings.get(root)){
-                count += 1;
-                tiles[p.y][p.x].setSide(-1);
-                tiles[p.y][p.x].setPlaced(false);
+        for(GoString g :strings){
+            if(g.getRoot().equals(root)){
+                if(g.getNodes().size() > 0){
+                    for(Point p : g.getNodes()){
+                        count += 1;
+                        tiles[p.y][p.x].setSide(-1);
+                        tiles[p.y][p.x].setPlaced(false);
+                    }
+                }
+                tiles[g.getRoot().y][g.getRoot().x].setSide(-1);
+                tiles[g.getRoot().y][g.getRoot().x].setPlaced(false);
+                strings.remove(g);
+                break;
             }
         }
-
-        remove.setSide(-1);
-        remove.setPlaced(false);
         count++;
 
         if(remove.getSide() == 0){
@@ -278,7 +315,6 @@ public class GameLogic {
         }else{
             adjustScore(0, count);
         }
-        strings.remove(root);
     }
 
 
