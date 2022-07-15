@@ -48,7 +48,6 @@ public class GameLogic {
             //if would result in string capture
             if(StringCaptureOnPlace(p, side)){
                 incerementMoveNo();
-                tiles[row][col].setInternalCapture(true);
                 return true;
             }else{
                 System.out.println("Cannot place without Ko");
@@ -72,22 +71,19 @@ public class GameLogic {
             int dx = p.x + direction[0];
             int dy = p.y + direction[1];
             Point newPoint = new Point(dx, dy);
-            if (side != tiles[p.y][p.x].getSide()) {
                 others.add(newPoint);
-                if (dy >= 1 && dy <= dim) {
-                    if (dx >= 1 && dx <= dim) {
-                        int cl = countLiberties(others);
-                        int ce = countEnemyOccupied(others);
-                        if (cl == ce)
-                            killCount++;
+                if (dy >= 1 && dy <= dim)
+                    if (dx >= 1 && dx <= dim)
+                        if (side != tiles[newPoint.y][newPoint.x].getSide()) {
+                            int cl = countLiberties(others);
+                            int ce = countEnemyOccupied(others);
+                            if (cl == ce)
+                                killCount++;
                     }
-                }
                 others.clear();
-            }
         }
-        if(killCount == 4){
+        if(killCount == 4)
             return true;
-        }
         return false;
     }
 
@@ -102,10 +98,6 @@ public class GameLogic {
             return;
         Point toRemove = null;
         for(GoString string : strings){
-            if(tiles[string.getRoot().y][string.getRoot().x].isInternalCapture()){
-                tiles[string.getRoot().y][string.getRoot().x].setInternalCapture(false);
-                continue;
-            }
             List<Point> toCheck = new ArrayList<>();
             toCheck.add(string.getRoot());
             if(string.getNodes().size() > 0) {
