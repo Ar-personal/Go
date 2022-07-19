@@ -22,9 +22,6 @@ public class MenuScreen {
         frame.setTitle("Go");
         frame.setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
 
-
-
-
         panel1 = new JPanel();
 
 
@@ -52,5 +49,13 @@ public class MenuScreen {
 
         frame.add(panel1);
         frame.setVisible(true);
+    }
+
+    public JFrame getFrame() {
+        return frame;
+    }
+
+    public void setFrame(JFrame frame) {
+        this.frame = frame;
     }
 }

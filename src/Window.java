@@ -2,6 +2,7 @@ import javax.swing.*;
 import java.awt.*;
 import java.awt.event.*;
 import java.io.*;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
@@ -18,6 +19,7 @@ public class Window extends JPanel{
 
     private MouseListener mouseListener;
     private BorderLayout borderLayout = new BorderLayout();
+    private List<Point> handicaps = new ArrayList();
 
     public Window(Go game, int dims){
         this.game = game;
@@ -27,6 +29,18 @@ public class Window extends JPanel{
         size = width / (dims + 1);
         createDisplay();
         createLayout();
+
+        int center = dims * (size / 2);
+        handicaps.add(new Point(center, center));
+        handicaps.add(new Point(center, center - (int)(size / 4) - (int) center / 2));
+        handicaps.add(new Point(center, center + (int)(size / 4) + (int) center / 2));
+        handicaps.add(new Point(center - (int)(size / 4) - (int) center / 2, center - (int)(size / 4) - (int) center / 2));
+        handicaps.add(new Point(center + (int)(size / 4) + (int) center / 2, center + (int)(size / 4) + (int) center / 2));
+        handicaps.add(new Point(center + (int)(size / 4) + (int) center / 2, center));
+        handicaps.add(new Point(center - (int)(size / 4) - (int) center / 2, center));
+        handicaps.add(new Point(center + (int)(size / 4) + (int) center / 2, center - (int)(size / 4) - (int) center / 2));
+        handicaps.add(new Point(center - (int)(size / 4) - (int) center / 2, center + (int)(size / 4) + (int) center / 2));
+
     }
 
     public void createDisplay(){
@@ -37,6 +51,64 @@ public class Window extends JPanel{
         frame.setVisible(true);
         frame.setLocationRelativeTo(null);
         frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+
+        this.setLayout(new BorderLayout());
+        JPanel buttonPanel = new JPanel(new GridLayout());
+
+        JButton jButton1 = new JButton();
+        jButton1.setText("resign");
+        JButton jButton2 = new JButton();
+        jButton2.setText("end");
+        JButton jButton3 = new JButton();
+        jButton3.setText("pass");
+        JButton jButton4 = new JButton();
+        jButton4.setText("new");
+
+        jButton1.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                if(game.getGameLogic().getMoveNo() % 2 != 0)
+                    JOptionPane.showMessageDialog(null, "White resigns, black wins");
+                else{
+                    JOptionPane.showMessageDialog(null, "Black resigns, white wins");
+                }
+            }
+        });
+
+        jButton2.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                game.getGameLogic().findTerritories();
+                String result = "";
+                if(game.getGameLogic().getBlackCaptured() == game.getGameLogic().getWhiteCaptured()){
+                    result = "The game ends in a draw";
+                }
+
+                if(game.getGameLogic().getBlackCaptured() > game.getGameLogic().getWhiteCaptured()){
+                    result = "White is victorious";
+                }else{
+                    result = "Black is victorious";
+                }
+
+                JOptionPane.showMessageDialog(null, result);
+            }
+        });
+
+        jButton3.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                game.getGameLogic().incerementMoveNo();
+            }
+        });
+
+        jButton4.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                game.restart();
+            }
+        });
+
+
 
         this.setPreferredSize(new Dimension(width, height));
         this.setMaximumSize(new Dimension(width, height));
@@ -49,8 +121,11 @@ public class Window extends JPanel{
 
         this.addMouseListener(mouseListener);
         this.addMouseMotionListener(mouseListener);
-        this.setLayout(new GridBagLayout());
-
+        buttonPanel.add(jButton1);
+        buttonPanel.add(jButton2);
+        buttonPanel.add(jButton3);
+        buttonPanel.add(jButton4);
+        this.add(buttonPanel, BorderLayout.SOUTH);
         frame.add(this);
         frame.pack();
     }
@@ -70,7 +145,7 @@ public class Window extends JPanel{
         for (int row = 0; row < tiles.length; row++) {
             x = 0;
             for (int column = 0; column < tiles[row].length; column++) {
-                tiles[row][column] = new Tile(game, x, y, false, "", size, column, row);
+                tiles[row][column] = new Tile(game, x, y, false, "", size, column, row, dims);
 
                 //the fringe tiles
                 if(row == 1 & column == 0 || column == 1 && row == 0){
@@ -84,10 +159,12 @@ public class Window extends JPanel{
                 if(row == 0 || row >= dims)
                     tiles[row][column].setRender(false);
 
+
                 if(column == 0 || column == dims + 1)
                     tiles[row][column].setLabel(true);
                 if(row == 0 || row == dims + 1)
                     tiles[row][column].setLabel(true);
+
 
                 if(row == 0 && column > 0 && column < dims + 1)
                         tiles[row][column].setLabel(getCharForNumber(column));
@@ -109,6 +186,9 @@ public class Window extends JPanel{
                 tiles[row][column].tick();
             }
         }
+        if(game.getGameLogic() != null)
+            frame.setTitle("Go     Move: " + game.getGameLogic().getMoveNo() + "     Black points: " + game.getGameLogic().getWhiteCaptured()
+                    + "     White points: " + game.getGameLogic().getBlackCaptured());
     }
 
     public void render(Graphics2D graphics2D){
@@ -118,6 +198,10 @@ public class Window extends JPanel{
             for (int column = 0; column < tiles[row].length; column++) {
                 tiles[row][column].render(graphics2D);
             }
+        }
+
+        for(Point p : handicaps){
+            graphics2D.fillOval(p.x + (int)(size / 2.5), p.y + (int)(size / 2.5), size / 6, size / 6);
         }
     }
 
@@ -165,4 +249,5 @@ public class Window extends JPanel{
     public Tile[][] getTiles() {
         return tiles;
     }
+
 }

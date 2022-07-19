@@ -1,17 +1,23 @@
 import java.awt.*;
 import java.net.URL;
+import java.util.ArrayList;
+import java.util.List;
 
 public class Tile {
     private Go game;
     private float mX, mY;
     private int x, y, tileID, posX, posY, side = -1;
     private boolean isPlaced = false, isLabel, isEdge, render = true;
+    private int dims;
     private int size;
     private String label;
     private Color color;
     private boolean internalCapture = false;
+    private boolean isKo = false;
 
-    public Tile(Go game, int x, int y, boolean isLabel, String label, int size, int posX, int posY){
+    private Point position;
+
+    public Tile(Go game, int x, int y, boolean isLabel, String label, int size, int posX, int posY, int dims){
         this.game = game;
         this.x = x;
         this.y = y;
@@ -20,6 +26,12 @@ public class Tile {
         this.size = size;
         this.posX = posX;
         this.posY = posY;
+        this.dims = dims;
+
+
+        //make the handicap points
+
+
     }
 
     public void tick(){
@@ -54,13 +66,15 @@ public class Tile {
     }
 
     public void render(Graphics2D g2d){
-        g2d.setColor(Color.red);
+        g2d.setColor(new Color(190, 130, 101));
         g2d.fillRect(x, y, size, size);
         g2d.setColor(Color.black);
 
         if(!isLabel && render) {
             g2d.drawRect(x, y, size -1, size -1);
         }
+
+
 
         if(isLabel){
             g2d.drawString(label, x, y + 10);
@@ -75,6 +89,16 @@ public class Tile {
 
     }
 
+
+
+
+    public boolean isKo() {
+        return isKo;
+    }
+
+    public void setKo(boolean ko) {
+        isKo = ko;
+    }
 
     public boolean isInternalCapture() {
         return internalCapture;

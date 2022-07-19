@@ -1,4 +1,4 @@
-
+import java.awt.event.WindowEvent;
 
 public class Go implements Runnable{
     private MenuScreen menuScreen;
@@ -77,6 +77,11 @@ public class Go implements Runnable{
         window = new Window(this, dim);
         tiles = window.getTiles();
         gameLogic = new GameLogic(this, tiles, dim);
+    }
+
+    public void restart(){
+        window.getFrame().setVisible(false);
+        menuScreen.getFrame().setVisible(true);
     }
 
     public Window getWindow() {

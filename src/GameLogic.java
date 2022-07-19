@@ -1,7 +1,5 @@
 import java.awt.*;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.Iterator;
+import java.util.*;
 import java.util.List;
 
 public class GameLogic {
@@ -10,13 +8,14 @@ public class GameLogic {
     private PointLogic pointLogic;
     private Tile[][] tiles;
     private int dim;
-    private int moveNo;
+    private int moveNo, currentTerritorySide = -1;
     private int whitePlaced = 0;
     private int blackPlaced = 0;
     private int whiteCaptured = 0;
     private int blackCaptured = 0;
     private int[][] surroundingTiles = new int[][]{{+1, 0}, {0, -1}, {-1, 0}, {0, + 1}};
     private List<GoString> strings = new ArrayList<>();
+    private List<List<Point>> territories = new ArrayList<>();
 
     public GameLogic(Go game, Tile[][] tiles, int dim) {
         this.game = game;
@@ -27,9 +26,7 @@ public class GameLogic {
 
 
     public void tick(){
-//        checkSingleCaptures();
         pointLogic.updatePoints(strings);
-        checkStringCaptures();
     }
 
     public boolean canPlace(int row, int col, int side){
@@ -37,11 +34,27 @@ public class GameLogic {
         Point p = new Point(col, row);
         tryPlace.add(p);
 
+        Tile t = tiles[row][col];
+        //cant place on an existing tile
+        if(t == null || t.isPlaced()){
+            tiles[row][col].setSide(t.getSide());
+            tiles[row][col].setPlaced(t.isPlaced());
+            return false;
+        }
+
         int stringLiberties = 0;
         int enemyOccupied = 0;
         //check entire strings liberty count
-        stringLiberties = countLiberties(tryPlace);
+        stringLiberties = countLiberties(tryPlace, side);
         enemyOccupied = countEnemyOccupied(tryPlace);
+
+        //Ko rule
+        if(tiles[row][col].isKo()){
+            System.out.println("cant place with Ko");
+            tiles[row][col].setPlaced(false);
+            tiles[row][col].setSide(-1);
+            return false;
+        }
 
 
         if(stringLiberties == enemyOccupied && enemyOccupied > 1){
@@ -50,7 +63,6 @@ public class GameLogic {
                 incerementMoveNo();
                 return true;
             }else{
-                System.out.println("Cannot place without Ko");
                 return false;
             }
         }
@@ -59,13 +71,23 @@ public class GameLogic {
         //if placment results in a string capture return true
         //if no capture and stone would be surrounded reutn false
         //ko?
+        resetKo();
         incerementMoveNo();
         return true;
+    }
+
+    public void resetKo(){
+        for(int row = 1; row < dim; row++){
+            for(int col = 1; col < dim; col++){
+                tiles[row][col].setKo(false);
+            }
+        }
     }
 
     public boolean StringCaptureOnPlace(Point p, int side){
         //for all strings if new stone causes string removal return true
         int killCount = 0;
+        Point koTile = new Point();
         List<Point> others = new ArrayList();
         for (int[] direction : surroundingTiles) {
             int dx = p.x + direction[0];
@@ -75,22 +97,91 @@ public class GameLogic {
                 if (dy >= 1 && dy <= dim)
                     if (dx >= 1 && dx <= dim)
                         if (side != tiles[newPoint.y][newPoint.x].getSide()) {
-                            int cl = countLiberties(others);
+                            int cl = countLiberties(others, side);
                             int ce = countEnemyOccupied(others);
-                            if (cl == ce)
+                            if (cl == ce) {
                                 killCount++;
+                                koTile = new Point(dx, dy);
+                            }
                     }
                 others.clear();
         }
         if(killCount == 4)
             return true;
+        if(killCount == 1) {
+            tiles[koTile.y][koTile.x].setKo(true);
+            return true;
+        }
         return false;
     }
 
-    public void findTerritories(){
+    public void findTerritories() {
+        //dibt bother unless a few stones have been placed
+        if(getMoveNo() < 3)
+            return;
 
+        for (int row = 1; row < dim; row++) {
+            outerloop:
+            for (int col = 1; col < dim; col++) {
+
+                List<Point> territory = new ArrayList<>();
+                Point newPoint = new Point(col, row);
+                if(tiles[row][col].getSide() >= 0)
+                    continue;
+
+                for(List<Point> p : territories){
+                    if(p.contains(newPoint))
+                        continue outerloop;
+                }
+
+                if(!territory.contains(newPoint))
+                    territory.add(newPoint);
+
+                int side = tiles[newPoint.y][newPoint.x].getSide();
+
+                int size = findAdjacentEmpties(territory).size();
+                while (true){
+                    if(size + findAdjacentEmpties(territory).size() == size)
+                        break;
+                    territory.addAll(findAdjacentEmpties(territory));
+                    size = findAdjacentEmpties(territory).size();
+                }
+
+                //if the liberties of this territory is surrounded by equal amount of same stone its a terri
+                if(checkIsTerritory(territory)) {
+                    int libs = countLiberties(territory, -1);
+                    int enemy = countEnemyOccupied(territory);
+
+                    if(libs > 0 && enemy > 0  && libs == enemy){
+                        territories.add(new ArrayList<>(territory));
+                        if(currentTerritorySide == 0)
+                            adjustScore(1, territory.size());
+                        else
+                            adjustScore(0, territory.size());
+                        territory.clear();
+                    }
+                }
+            }
+        }
     }
 
+    private List<Point> findAdjacentEmpties(List<Point> list){
+        List<Point> toAdd = new ArrayList<>();
+        for(Point p : list){
+            for (int[] direction : surroundingTiles) {
+                int dx = p.x + direction[0];
+                int dy = p.y + direction[1];
+                Point newPoint = new Point(dx, dy);
+                    if (dy >= 1 && dy <= dim)
+                        if (dx >= 1 && dx <= dim)
+                            if(tiles[dy][dx].getSide() == -1)
+                                if(!list.contains(newPoint) && !toAdd.contains(newPoint))
+                                    toAdd.add(newPoint);
+
+            }
+        }
+        return toAdd;
+    }
 
     //when a group of stones is surrounded
     public void checkStringCaptures(){
@@ -107,7 +198,7 @@ public class GameLogic {
             int stringLiberties = 0;
             int enemyOccupied = 0;
             //check entire strings liberty count
-            stringLiberties = countLiberties(toCheck);
+            stringLiberties = countLiberties(toCheck, string.getSide());
             enemyOccupied = countEnemyOccupied(toCheck);
 
             if(stringLiberties > 0 && enemyOccupied > 0  && stringLiberties == enemyOccupied){
@@ -120,7 +211,40 @@ public class GameLogic {
             removeString(toRemove);
     }
 
-    public int countLiberties(List<Point> stones){
+
+    public boolean checkIsTerritory(List<Point> empties){
+        boolean isWhite = false;
+        boolean isBlack = false;
+        for(Point p : empties){
+            for(int[] direction : surroundingTiles) {
+                int dx = p.x + direction[0];
+                int dy = p.y + direction[1];
+
+                if (dy >= 1 && dy <= dim) {
+                    if (dx >= 1 && dx <= dim) {
+                        Point check = new Point(dx, dy);
+                        //check if all the surrounding tiles are the same, if not it cant be a territory
+                        if (tiles[check.y][check.x].getSide() == 0) {
+                            if(isBlack)
+                                return false;
+                            isWhite = true;
+                        }
+
+                        if (tiles[check.y][check.x].getSide() == 1) {
+                            if(isWhite)
+                                return false;
+                            isBlack = true;
+                        }
+                        currentTerritorySide = tiles[check.y][check.x].getSide();
+                    }
+                }
+            }
+        }
+        return true;
+    }
+
+
+    public int countLiberties(List<Point> stones, int side){
         int count = 0;
         for(Point p : stones) {
             count += 4;
@@ -138,11 +262,9 @@ public class GameLogic {
                 if (dy >= 1 && dy <= dim) {
                     if (dx >= 1 && dx <= dim) {
                         Point check = new Point(dx, dy);
-                        //check that the other tile is not a friendly stone and is definitely placed
-                        if (tiles[check.y][check.x].getSide() == tiles[p.y][p.x].getSide()) {
-                            if (tiles[check.y][check.x].getSide() >= 0) {
+                        //check that the other tile is not a friendly stone
+                        if (tiles[check.y][check.x].getSide() == side) {
                                 count--;
-                            }
                         }
                     }
                 }
@@ -194,6 +316,8 @@ public class GameLogic {
                 addToStrings(coords, side);
             }
         }
+
+        checkStringCaptures();
     }
 
     public void addToStrings(Point coords, int side){
@@ -279,6 +403,7 @@ public class GameLogic {
 
     public void removeString(Point root){
         Tile remove = tiles[root.y][root.x];
+        int side = remove.getSide();
         int count = 0;
         if(remove.getSide() == -1) {
             System.out.println("error removing string: cannot remove nothing at " + root.toString());
@@ -302,7 +427,7 @@ public class GameLogic {
         }
         count++;
 
-        if(remove.getSide() == 0){
+        if(side == 0){
             adjustScore(1, count);
         }else{
             adjustScore(0, count);
@@ -357,5 +482,14 @@ public class GameLogic {
 
     public void setBlackPlaced(int blackPlaced) {
         this.blackPlaced = blackPlaced;
+    }
+
+
+    public int getWhiteCaptured() {
+        return whiteCaptured;
+    }
+
+    public int getBlackCaptured() {
+        return blackCaptured;
     }
 }
