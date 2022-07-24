@@ -37,6 +37,7 @@ public class GameLogic {
         Tile t = tiles[row][col];
         //cant place on an existing tile
         if(t == null || t.isPlaced()){
+            System.out.println("stone already exists there");
             tiles[row][col].setSide(t.getSide());
             tiles[row][col].setPlaced(t.isPlaced());
             return false;
@@ -47,6 +48,7 @@ public class GameLogic {
         //check entire strings liberty count
         stringLiberties = countLiberties(tryPlace, side);
         enemyOccupied = countEnemyOccupied(tryPlace);
+
 
         //Ko rule
         if(tiles[row][col].isKo()){
@@ -63,6 +65,9 @@ public class GameLogic {
                 incerementMoveNo();
                 return true;
             }else{
+                System.out.println("string doesnt result in capture");
+                tiles[row][col].setPlaced(false);
+                tiles[row][col].setSide(-1);
                 return false;
             }
         }
@@ -82,6 +87,18 @@ public class GameLogic {
                 tiles[row][col].setKo(false);
             }
         }
+    }
+
+    public boolean surroundedByEnemy(Point p, int side){
+        for (int[] direction : surroundingTiles) {
+            int dx = p.x + direction[0];
+            int dy = p.y + direction[1];
+            if (dy >= 1 && dy <= dim)
+                if (dx >= 1 && dx <= dim)
+                    if(tiles[dy][dx].getSide() == side || tiles[dy][dx].getSide() == -1)
+                        return false;
+        }
+        return true;
     }
 
     public boolean StringCaptureOnPlace(Point p, int side){
